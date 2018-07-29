@@ -1,1 +1,1 @@
-This a GUI launcher for Jupyter Notebook.
+A GUI launcher for Jupyter Notebook.
