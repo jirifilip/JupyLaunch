@@ -8,20 +8,17 @@ from multiprocessing import Process
 import subprocess
 import shlex
 
-from directory_popup import DirectoryPopup
-
-
-
-WINDOW_SIZE = 500, 500
 STRETCH = tk.W + tk.E + tk.N + tk.S
 
 class NotADirectoryException(Exception):
     pass
 
 class Application(tk.Frame):
-    def __init__(self, master=None):
+    def __init__(self, master=None, config=None, consts={}):
         super().__init__(master)
 
+        self.config = config
+        self.CONSTS = consts
         self.master = master
         self.configure_startup()
         self.pack()
@@ -35,7 +32,13 @@ class Application(tk.Frame):
 
 
     def load_directories(self):
-        self.filename = "directories.txt"
+        filename_key = self.CONSTS["SETTINGS_FILENAME_KEY"]
+
+        self.filename = "{}/{}/{}".format(
+            os.path.expanduser("~"),
+            self.CONSTS["JUPYLAUNCH_HOMEDIR"],
+            self.config["DEFAULT"][filename_key]
+        )
 
         self.directories = []
 
@@ -51,11 +54,9 @@ class Application(tk.Frame):
 
                 
                 
-
-
-
         except NotADirectoryException as e:
-            print("Not a directory")
+            print("Problem parsing the directory file.")
+            print(e)
         except Exception as e:
             print(e)
 
@@ -66,14 +67,17 @@ class Application(tk.Frame):
         self.launch_button["text"] = "Launch"
         self.launch_button["command"] = self.launch_jupyter
 
-
+        
         self.add_button = tk.Button(self)
-        self.add_button["text"] = "Add directory"
+        self.add_button["text"] = "Add directory to list"
         self.add_button["command"] = self.directory_add_clicked
+
+        self.remove_button = tk.Button(self)
+        self.remove_button["text"] = "Remove directory from list"
+        self.remove_button["command"] = self.directory_remove_clicked
         
 
-        self.quit = tk.Button(self, text="QUIT", fg="red",
-                              command=root.destroy)
+        self.quit = tk.Button(self, text="Quit", command=self.master.destroy)
         
         
         self.create_directories_buttons()
@@ -81,8 +85,9 @@ class Application(tk.Frame):
 
         self.dir_listbox.grid(row=0, column=0, columnspan=2, sticky=STRETCH)
         self.add_button.grid(row=1, columnspan=2, sticky=STRETCH)
-        self.launch_button.grid(row=2, column=0, sticky=STRETCH)
-        self.quit.grid(row=2, column=1, sticky=STRETCH)
+        self.remove_button.grid(row=2, columnspan=2, sticky=STRETCH)        
+        self.launch_button.grid(row=3, column=0, sticky=STRETCH)
+        self.quit.grid(row=3, column=1, sticky=STRETCH)
         
 
     def create_directories_buttons(self):
@@ -96,26 +101,32 @@ class Application(tk.Frame):
         
 
     def directory_add_clicked(self):
-        #dirname = self.directory_popup()
-        dirname = askdirectory(title="Choose a directory")
+        dirname = askdirectory(title="Choose a directory", initialdir=os.path.expanduser("~"))
 
         if os.path.isdir(dirname):
+            self.directories.append(dirname)
             self.dir_listbox.insert(tk.END, dirname)
 
-            with open(self.filename, "a") as f:
-                f.write("\n{}".format(dirname))
+            self.write_dirnames()
 
-    def directory_popup(self):
-        param = { "dir" : None }
 
-        self.add_window = DirectoryPopup(self.master, param, "dir")
+    def directory_remove_clicked(self):
+        idx = self.dir_listbox.curselection()[0]
+        
+        self.dir_listbox.delete(idx)
+        del self.directories[idx]
+        
 
-        self.master.wait_window(self.add_window)
+        self.write_dirnames()
 
-        print(param["dir"])
 
-        return param["dir"]
 
+    def write_dirnames(self):
+        new_file_text = "\n".join(self.directories)
+
+        with open(self.filename, "w") as f:
+            f.write(new_file_text)
+        
 
 
 
@@ -133,15 +144,3 @@ class Application(tk.Frame):
 
         
         jupyter_process()
-        
-
-
-
-
-
-
-
-
-root = tk.Tk()
-app = Application(master=root)
-app.mainloop()
